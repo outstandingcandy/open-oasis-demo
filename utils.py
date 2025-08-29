@@ -63,15 +63,18 @@ def one_hot_actions(actions: Sequence[Mapping[str, int]]) -> torch.Tensor:
         for j, action_key in enumerate(ACTION_KEYS):
             if action_key.startswith("camera"):
                 if action_key == "cameraX":
-                    value = current_actions["camera"][0]
+                    # value = current_actions["camera"][0]
+                    value = 0
                 elif action_key == "cameraY":
-                    value = current_actions["camera"][1]
+                    # value = current_actions["camera"][1]
+                    value = 0
                 else:
                     raise ValueError(f"Unknown camera action key: {action_key}")
                 max_val = 20
                 bin_size = 0.5
                 num_buckets = int(max_val / bin_size)
                 value = (value - num_buckets) / num_buckets
+                value = 0
                 assert -1 - 1e-3 <= value <= 1 + 1e-3, f"Camera action value must be in [-1, 1], got {value}"
             else:
                 value = current_actions[action_key]
@@ -105,6 +108,14 @@ def load_prompt(path, video_offset=None, n_prompt_frames=1):
     prompt = prompt.float() / 255.0
     return prompt
 
+def load_actions_from_text(action_text):
+    actions = []
+    for line in action_text.split("\n"):
+        if line.strip() == "":
+            continue
+        action = line.split(" ")[1:]
+        actions.append(action)
+
 
 def load_actions(path, action_offset=None):
     if path.endswith(".actions.pt"):
@@ -115,7 +126,11 @@ def load_actions(path, action_offset=None):
         raise ValueError("unrecognized action file extension; expected '*.actions.pt' or '*.one_hot_actions.pt'")
     if action_offset is not None:
         actions = actions[action_offset:]
-    actions = torch.cat([torch.zeros_like(actions[:1]), actions], dim=0)
+    # actions = torch.cat([torch.zeros_like(actions[:1]), actions], dim=0)
+    # copy the first element to other elements
+    single_action = torch.zeros_like(actions[0])
+    single_action[11] = 1 # forward
+    actions = torch.cat([single_action.unsqueeze(0).repeat(actions.shape[0], 1), actions], dim=0)
     # add batch dimension
     actions = rearrange(actions, "t d -> 1 t d")
     return actions
